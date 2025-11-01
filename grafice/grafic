@@ -1,0 +1,20 @@
+\[florin\_iulian.dobre\@haswell-wn40 src]\$ ./tema3\_neopt ../input/input
+Run=./tema3\_neopt: N=200: Time=0.143469
+Run=./tema3\_neopt: N=600: Time=5.906816
+Run=./tema3\_neopt: N=1000: Time=26.492886
+Run=./tema3\_neopt: N=800: Time=11.645406
+Run=./tema3\_neopt: N=1200: Time=43.928516
+\[florin\_iulian.dobre\@haswell-wn40 src]\$ ./tema3\_opt\_m ../input/input
+Run=./tema3\_opt\_m: N=200: Time=0.101126
+Run=./tema3\_opt\_m: N=600: Time=2.837459
+Run=./tema3\_opt\_m: N=1000: Time=13.199459
+Run=./tema3\_opt\_m: N=800: Time=6.669903
+Run=./tema3\_opt\_m: N=1200: Time=22.013166
+\[florin\_iulian.dobre\@haswell-wn40 src]\$ ./tema3\_blas ../input/input
+Run=./tema3\_blas: N=200: Time=0.006965
+Run=./tema3\_blas: N=600: Time=0.192032
+Run=./tema3\_blas: N=1000: Time=0.848658
+Run=./tema3\_blas: N=800: Time=0.438685
+Run=./tema3\_blas: N=1200: Time=1.473411
+\[florin\_iulian.dobre\@haswell-wn40 src]\$
+

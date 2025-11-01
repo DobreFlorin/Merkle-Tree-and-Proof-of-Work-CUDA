@@ -1,0 +1,440 @@
+LLM folosit:
+GPT-4o
+
+Prompturi:
+
+Question:
+gcc  compare.c utils.h -lm -o compare
+gcc -Wall -Werror -O0 -march=native solver\_blas.c main.c utils.h -L/usr/lib64/atlas -lsatlas -o tema3\_blas
+/usr/bin/ld: cannot find -lsatlas: No such file or directory
+collect2: error: ld returned 1 exit status
+make: \*\*\* \[Makefile:10: tema3\_blas] Error 1
+Answer:
+The error you're seeing:
+/usr/bin/ld: cannot find -lsatlas: No such file or directory
+collect2: error: ld returned 1 exit status
+means that the linker can't find the satlas library (part of the ATLAS BLAS implementation).
+
+ What is -lsatlas?
+
+-lsatlas tells the linker to link against the ATLAS (Automatically Tuned Linear Algebra Software) library's libsatlas.so.
+
+If libsatlas.so is not found in the standard library paths or the path specified by -L/usr/lib64/atlas, the linking will fail.
+✅ Solutions
+1. Make sure ATLAS is installed
+On Ubuntu/Debian:
+
+sudo apt-get update
+sudo apt-get install libatlas-base-dev
+
+This installs ATLAS and the necessary symlinks (like libsatlas.so) in standard locations (/usr/lib or /usr/lib/x86_64-linux-gnu/).
+On Fedora/RHEL/CentOS:
+
+Use:
+
+sudo dnf install atlas-devel
+
+Or if using yum:
+
+sudo yum install atlas-devel
+
+2. Locate libsatlas.so manually
+
+Run:
+
+sudo find /usr -name "libsatlas.so*"
+
+If it's found somewhere like /usr/lib64, make sure your -L path includes that directory.
+You can update your command like:
+
+gcc -Wall -Werror -O0 -march=native solver_blas.c main.c utils.h -L/usr/lib64 -lsatlas -o tema3_blas
+
+3. Alternative: Use OpenBLAS
+
+If ATLAS is unavailable, you can switch to OpenBLAS, which is faster and easier to install.
+
+Install OpenBLAS:
+
+sudo apt-get install libopenblas-dev  # Debian/Ubuntu
+
+Then link with:
+
+-lopenblas
+
+Update the command:
+
+gcc -Wall -Werror -O0 -march=native solver_blas.c main.c utils.h -lopenblas -o tema3_blas
+
+🧪 Test It
+
+To confirm it's linked properly:
+
+ldd ./tema3_blas
+
+LLM GPT 4.1
+Write a C code that implements the next calculus ... in three ways:
+- one normal way without optimization 
+- one optimized way( include things like loop efficiency, reuse of computation etc.)
+- one using blas library 
+Answer:( Not all the same as in the final code)
+neopt:
+/*
+ * Tema 2 ASC
+ * 2025 Spring
+ */
+#include "utils.h"
+#include <stdlib.h>
+#include <string.h>
+
+/*
+ * Add your unoptimized implementation here
+ */
+double* my_solver(int N, double *A, double *B, double *x) {
+    // Allocate matrices C and D as 2D arrays (array of pointers)
+    double **C = (double **)malloc(N * sizeof(double *));
+    double **D = (double **)malloc(N * sizeof(double *));
+    int i, j, k, iter;
+
+    for (i = 0; i < N; ++i) {
+        C[i] = (double *)calloc(N, sizeof(double));
+        D[i] = (double *)calloc(N, sizeof(double));
+    }
+
+    // Compute C = B * A^T
+    for (i = 0; i < N; ++i) {
+        for (j = 0; j < N; ++j) {
+            C[i][j] = 0.0;
+            for (k = 0; k < N; ++k) {
+                C[i][j] += B[i*N + k] * A[j*N + k];
+            }
+        }
+    }
+  
+
+    // Compute D = C^T * A
+    for (i = 0; i < N; ++i) {
+        for (j = 0; j < N; ++j) {
+            D[i][j] = 0.0;
+            for (k = 0; k < N; ++k) {
+                D[i][j] += C[k][i] * A[k*N + j];
+            }
+        }
+    }
+
+    // Temporary vectors for the loop
+    double *y_loop = (double *)calloc(N, sizeof(double));
+    double *x_loop = (double *)calloc(N, sizeof(double));
+
+    for (iter = 0; iter < N; ++iter) {
+        // y = C^T * x
+        for (i = 0; i < N; ++i) {
+            y_loop[i] = 0.0;
+            for (k = 0; k < N; ++k) {
+                y_loop[i] += C[k][i] * x[k];
+            }
+        }
+
+        // x = C * y_loop
+        for (i = 0; i < N; ++i) {
+            x_loop[i] = 0.0;
+            for (k = 0; k < N; ++k) {
+                x_loop[i] += C[i][k] * y_loop[k];
+            }
+        }
+
+        // Update x
+        memcpy(x, x_loop, N * sizeof(double));
+    }
+
+    // Allocate output vector y
+    double *y = (double *)calloc(N, sizeof(double));
+
+    // Compute y = D * x
+    for (i = 0; i < N; ++i) {
+        y[i] = 0.0;
+        for (k = 0; k < N; ++k) {
+            y[i] += D[i][k] * x[k];
+        }
+    }
+
+    // Cleanup
+    for (i = 0; i < N; ++i) {
+        free(C[i]);
+        free(D[i]);
+    }
+    free(C);
+    free(D);
+    free(y_loop);
+    free(x_loop);
+
+    return y;
+}
+blas:
+/*
+ * Tema 2 ASC
+ * 2024 Spring
+ */
+#include "utils.h"
+#include <cblas.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* 
+ * Add your BLAS implementation here
+ */
+double* my_solver(int N, double *A, double *B, double *x) {
+    double* C = (double*)malloc(N * N * sizeof(double));
+    double* D = (double*)malloc(N * N * sizeof(double));
+    double* y_loop = (double*)malloc(N * sizeof(double));
+    double* x_loop = (double*)malloc(N * sizeof(double));
+    double* y = (double*)malloc(N * sizeof(double));
+    int iter;
+
+    // C = B * A^T
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, N, N, N, 1.0, B, N, A, N, 0.0, C, N);
+
+    // D = C^T * A
+    cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, N, N, N, 1.0, C, N, A, N, 0.0, D, N);
+
+    for (iter = 0; iter < N; ++iter) {
+        // y_loop = C^T * x
+        cblas_dgemv(CblasRowMajor, CblasTrans, N, N, 1.0, C, N, x, 1, 0.0, y_loop, 1);
+        // x_loop = C * y_loop
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, N, N, 1.0, C, N, y_loop, 1, 0.0, x_loop, 1);
+        memcpy(x, x_loop, N * sizeof(double));
+    }
+
+    // y = D * x
+    cblas_dgemv(CblasRowMajor, CblasNoTrans, N, N, 1.0, D, N, x, 1, 0.0, y, 1);
+
+    free(C);
+    free(D);
+    free(y_loop);
+    free(x_loop);
+
+    return y;
+}
+opt_m:
+#include "utils.h"
+#include <stdlib.h>
+#include <string.h>
+
+double* my_solver(int N, double *A, double *B, double *x) {
+    int i, j, k, iter;
+    double* C = (double*)calloc(N*N, sizeof(double));
+    double* D = (double*)calloc(N*N, sizeof(double));
+    double* At = (double*)malloc(N*N * sizeof(double));
+    double* Ct = (double*)malloc(N*N * sizeof(double));
+    double* y_loop = (double*)malloc(N * sizeof(double));
+    double* x_loop = (double*)malloc(N * sizeof(double));
+    double* y = (double*)malloc(N * sizeof(double));
+
+    // Precompute At = A^T
+    for (i = 0; i < N; ++i) {
+        for (j = 0; j < N; ++j) {
+            At[i*N + j] = A[j*N + i];
+        }
+    }
+
+    // Compute C = B * At using optimized loop order
+    for (i = 0; i < N; ++i) {
+        for (k = 0; k < N; ++k) {
+            double B_ik = B[i*N + k];
+            for (j = 0; j < N; ++j) {
+                C[i*N + j] += B_ik * At[j*N + k];
+            }
+        }
+    }
+
+    // Precompute Ct = C^T
+    for (i = 0; i < N; ++i) {
+        for (j = 0; j < N; ++j) {
+            Ct[i*N + j] = C[j*N + i];
+        }
+    }
+
+    // Compute D = Ct * A using optimized loop order
+    for (i = 0; i < N; ++i) {
+        for (k = 0; k < N; ++k) {
+            double Ct_ik = Ct[i*N + k];
+            for (j = 0; j < N; ++j) {
+                D[i*N + j] += Ct_ik * A[k*N + j];
+            }
+        }
+    }
+
+    // Optimized loop with contiguous accesses
+    for (iter = 0; iter < N; ++iter) {
+        for (i = 0; i < N; ++i) {
+            double sum = 0.0;
+            for (k = 0; k < N; ++k) {
+                sum += Ct[i*N + k] * x[k];
+            }
+            y_loop[i] = sum;
+        }
+
+        for (i = 0; i < N; ++i) {
+            double sum = 0.0;
+            for (k = 0; k < N; ++k) {
+                sum += C[i*N + k] * y_loop[k];
+            }
+            x_loop[i] = sum;
+        }
+
+        memcpy(x, x_loop, N * sizeof(double));
+    }
+
+    // Final y = D * x
+    for (i = 0; i < N; ++i) {
+        double sum = 0.0;
+        for (k = 0; k < N; ++k) {
+            sum += D[i*N + k] * x[k];
+        }
+        y[i] = sum;
+    }
+
+    free(C);
+    free(D);
+    free(At);
+    free(Ct);
+    free(y_loop);
+    free(x_loop);
+
+    return y;
+}
+
+  
+    GPT-40:
+    
+    how does this look like: ==2044590== Cachegrind, a high-precision tracing profiler
+\==2044590== Copyright (C) 2002-2017, and GNU GPL'd, by Nicholas Nethercote et al.
+\==2044590== Using Valgrind-3.22.0 and LibVEX; rerun with -h for copyright info
+\==2044590== Command: sbatch -p haswell ./tema3\_opt\_m ../input/input\_valgrind
+\==2044590==
+\--2044590-- warning: L3 cache found, using its data for the LL simulation.
+sbatch: error: This does not look like a batch script.  The first
+sbatch: error: line must start with #! followed by the path to an interpreter.
+sbatch: error: For instance: #!/bin/sh
+\==2044590==
+\==2044590== I refs:        15,857,735
+\==2044590== I1  misses:        29,754
+\==2044590== LLi misses:         4,002
+\==2044590== I1  miss rate:       0.19%
+\==2044590== LLi miss rate:       0.03%
+\==2044590==
+\==2044590== D refs:         5,813,139  (3,867,811 rd   + 1,945,328 wr)
+\==2044590== D1  misses:        59,291  (   42,137 rd   +    17,154 wr)
+\==2044590== LLd misses:        13,462  (    7,772 rd   +     5,690 wr)
+\==2044590== D1  miss rate:        1.0% (      1.1%     +       0.9%  )
+\==2044590== LLd miss rate:        0.2% (      0.2%     +       0.3%  )
+\==2044590==
+\==2044590== LL refs:           89,045  (   71,891 rd   +    17,154 wr)
+\==2044590== LL misses:         17,464  (   11,774 rd   +     5,690 wr)
+\==2044590== LL miss rate:         0.1% (      0.1%     +       0.3%  )
+\==2044590==
+\==2044590== Branches:       2,971,685  (2,888,064 cond +    83,621 ind)
+\==2044590== Mispredicts:      169,583  (  161,780 cond +     7,803 ind)
+\==2044590== Mispred rate:         5.7% (      5.6%     +       9.3%   )
+Answer:
+What you've posted is a Cachegrind output, which is a profiling result from running a program under Valgrind's Cachegrind tool — a high-precision cache and branch prediction profiler.
+
+Let’s break down each section:
+🔧 Execution & Error Info
+
+==2044590== Cachegrind, a high-precision tracing profiler
+==2044590== Using Valgrind-3.22.0 and LibVEX...
+==2044590== Command: sbatch -p haswell ./tema3_opt_m ../input/input_valgrind
+
+    You're running Cachegrind on a SLURM batch job using sbatch, which fails because you're trying to run a compiled executable (./tema3_opt_m) directly with sbatch, which expects a batch script (with #!/bin/sh or similar at the top).
+
+❌ sbatch Errors:
+
+sbatch: error: This does not look like a batch script...
+
+So: Your actual program didn’t run. Cachegrind still processed the attempt, but this is profiling the shell error behavior — not your real application.
+✅ Cachegrind Report
+
+Even though the real computation didn't happen, here's what each section of the Cachegrind report would mean if the program had run:
+🔹 Instruction Cache Performance (I)
+
+I refs:        15,857,735      # total instructions executed
+I1  misses:        29,754      # L1 instruction cache misses
+LLi misses:         4,002      # last-level cache (LL) instruction misses
+
+    I1 miss rate: 0.19% – good (below 1% is often acceptable)
+
+    LLi miss rate: 0.03% – very low, excellent
+
+🔹 Data Cache Performance (D)
+
+D refs:         5,813,139  (3,867,811 rd   + 1,945,328 wr)
+D1  misses:        59,291  (   42,137 rd   +    17,154 wr)
+LLd misses:        13,462  (    7,772 rd   +     5,690 wr)
+
+    L1 data cache miss rate: 1.0%
+
+    LL (last-level) data cache miss rate: 0.2%
+
+These indicate:
+
+    Your program accesses data moderately efficiently.
+
+    Low LLd miss rates suggest the memory hierarchy is performing well.
+
+🔹 Combined Last-Level Cache (LL)
+
+LL refs:           89,045  (   71,891 rd   +    17,154 wr)
+LL misses:         17,464  (   11,774 rd   +     5,690 wr)
+LL miss rate:         0.1% (      0.1%     +       0.3%  )
+
+    LL miss rate is very low → good locality, low pressure on memory.
+
+🔹 Branch Prediction
+
+Branches:       2,971,685  (2,888,064 cond +    83,621 ind)
+Mispredicts:      169,583  (  161,780 cond +     7,803 ind)
+Mispred rate:         5.7% (      5.6%     +       9.3%   )
+
+    5.7% branch misprediction rate:
+
+        Acceptable, but might improve with better branch structure.
+
+        Indirect branches (e.g., function pointers) have higher miss rates, as expected.
+
+❗ Important Takeaway
+
+Your actual program did not run due to misuse of sbatch. To get a real Cachegrind profile:
+
+How to Properly Run Cachegrind
+
+Instead of:
+
+valgrind --tool=cachegrind sbatch -p haswell ./tema3_opt_m ../input/input_valgrind
+
+Do one of the following:
+🔹 Option 1: Run interactively on a compute node
+
+srun -p haswell --pty bash
+valgrind --tool=cachegrind ./tema3_opt_m ../input/input_valgrind
+
+🔹 Option 2: Use a proper SLURM batch script
+
+#!/bin/bash
+#SBATCH -p haswell
+valgrind --tool=cachegrind ./tema3_opt_m ../input/input_valgrind
+
+Save as run_cachegrind.sh, then:
+
+sbatch run_cachegrind.sh
+
+🧠 Summary
+
+    You ran Cachegrind on an invalid sbatch command, so the output is not from your real application.
+
+    Cachegrind reports cache and branch performance in great detail.
+
+    To get useful results, run your program correctly (either directly or via SLURM batch script).
+
+    The .memory output is usually .out or redirected .log — not .memory by default.
+
+Let me know if you want help interpreting Cachegrind results from a working run, or want help writing a valid batch script.
